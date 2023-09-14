@@ -16,4 +16,6 @@ python axs-webscraper.py <start> <stop>
 ## TODO
 - add gui
 - async
+  - sync -> 1054.10s
+  - threadpool -> 444.75s
 - automatically download webdriver using `platform.system()` and `platform.machine().endswith('64')`
