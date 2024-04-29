@@ -1,44 +1,73 @@
 import sys
-import math
-import datetime
+import csv
 import time
-import concurrent.futures
-from selenium import webdriver
-from bs4 import BeautifulSoup
-from selenium.webdriver.chrome.options import Options
+import datetime
 
-# Set Chrome options for headless mode
-chrome_options = Options()
-chrome_options.add_argument("--headless")
+import asyncio
+# https://requests.readthedocs.io/projects/requests-html/en/latest/
+from requests_html import AsyncHTMLSession
+from bs4 import BeautifulSoup
 
 # Open new file
 current_datetime = datetime.datetime.now()
 formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
 filename = f"data_{formatted_datetime}.csv"
 
+sem = asyncio.Semaphore(10)
 
 
-def get_html_of_webpages(urls):
-    """Use selenium to get the html of a webpage (bypasses no-js pages unlike requests lib)
+async def get_response_from_webpage(url, asession):
+    """Get the html of a webpage
+
+    Args:
+        url (str): URL of webpage
+        asession (AsyncHTMLSession): Async HTML session from requests_html lib
+
+    Returns:
+        requests.Response: Response object of webpage
+    """
+    print(f"sending request to {url}")
+    r = await asession.get(url)
+    print(f"response received for {url}")
+    return r
+
+
+
+async def render_webpage_response(resp):
+    """Render dynamic html by executing the javascript in the initial response from the server
+
+    Args:
+        resp (requests.Response): Initial response object of webpage
+
+    Returns:
+        requests_html.HTML: HTML object of webpage
+    """
+    async with sem:
+        print(f"rendering html for {resp.url}")
+        await resp.html.arender(timeout=0)
+        print(f"finished rendering html for {resp.url}")
+        return resp.html
+
+
+
+async def get_html_of_webpages(urls):
+    """Get html of multiple webpages
 
     Args:
         urls (list[str]): URLs of webpages
 
     Returns:
-        list[str]: List of rendered HTML of webpages
+        list[requests_html.HTML]: List of HTML objects of webpages
     """
 
-    # initialize webdriver
-    print("Initializing webdriver...")
-    driver = webdriver.Chrome(options=chrome_options)
-    print("Webdriver initialized\n")
+    # GET requests to server
+    asession = AsyncHTMLSession()
+    request_coros = [get_response_from_webpage(url, asession) for url in urls]
+    responses = await asyncio.gather(*request_coros)
 
-    htmls = []
-    for url in urls:
-        print(f"{url}")
-        driver.get(url)  # load page with js execution
-        htmls.append(driver.page_source)  # store the rendered html
-    driver.quit()
+    # render javascript
+    render_coros = [render_webpage_response(response) for response in responses]
+    htmls = await asyncio.gather(*render_coros)
     return htmls
 
 
@@ -47,16 +76,15 @@ def get_axs_title_from_html(html):
     """Grab the axs title from the html of an axs page
 
     Args:
-        html (str): HTML of webpage
+        html (requests_html.HTML): HTML object of webpage
 
     Returns:
         str|None: The title of the axs event if it exists, else None
     """
-    soup = BeautifulSoup(html, 'html.parser')  # create a BeautifulSoup object from the html
-    axs_title = soup.find('h1', class_='series-header__main-title')
+    axs_title = html.find("h1.series-header__main-title", first=True)
 
-    if axs_title:  # if title exists
-        axs_title = axs_title.text.strip()  # remove html tags and leading/trailing whitespace
+    if axs_title:
+        axs_title = axs_title.full_text.strip()  # remove html tags and leading/trailing whitespace
 
     return axs_title
 
@@ -69,9 +97,9 @@ def get_axs_titles_from_urls(urls):
         urls (list[str]): URLs of webpages
 
     Returns:
-        list[str|None]: The titles of the axs events
+        list[str|None]: The titles of the axs events in corresponding order of the given urls
     """
-    htmls = get_html_of_webpages(urls)
+    htmls = asyncio.run(get_html_of_webpages(urls))
 
     titles = []
     for html in htmls:
@@ -87,6 +115,7 @@ def axs_id_to_url(id):
 
     Args:
         id (int): event ID of an axs event
+
     Returns:
         str: URL of event
     """
@@ -110,56 +139,14 @@ def get_axs_titles_from_ids(ids):
 
 
 
-def process_csv(results):
-    print(results)
-
-
-
-def split_list(l, n_chunks):
-    """Split a list into a number of smaller lists
-
-    Args:
-        l (list[Any]): List to split
-        n_chunks (int): Number of chunks to split into
-
-    Returns:
-        list[list[Any]]: The split-up list
-    """
-    chunk_size = math.ceil(len(l) // n_chunks)
-    if n_chunks >= len(l):
-        return l
-    return [l[i:i + chunk_size] for i in range(0, len(l), chunk_size)]
-
-
-
-def get_axs_titles_from_ids_concurrently(start, stop):
-    """Get axs titles for events from start to stop (inclusive)
-
-    Args:
-        start (int): Event ID of first event
-        stop (int): Event ID of last event
-
-    Returns:
-        list[tuple[int, title]]: A list of tuples containing the event id and the corresponding title
-    """
-    ids = list(range(start, stop))
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        id_chunks = split_list(ids, executor._max_workers)
-        future_to_id = {executor.submit(get_axs_titles_from_ids, id_chunk): id_chunk for id_chunk in id_chunks}
-
-    ids_and_titles = []
-    for future in concurrent.futures.as_completed(future_to_id):
-        id_chunk = future_to_id[future]
-        title_chunk = future.result()
-        ids_and_titles.append([id_chunk, title_chunk])
-
-    return ids_and_titles
+def process_csv(data, filepath, force=False):
+    # TODO: actually process file
+    print(data)
 
 
 
 if __name__ == "__main__":
-    # Parse arguments to script
+    # parse cli arguments
     argc = len(sys.argv) - 1
     if argc != 2:
         print(f"Incorrect number of arguments: Expected 2 arguments (start, stop) but received {argc}")
@@ -167,9 +154,14 @@ if __name__ == "__main__":
 
     start_id, stop_id = int(sys.argv[1]), int(sys.argv[2])
 
+    # ----- Benchmark start ----- #
     start_time = time.time()
 
-    ids_and_titles = get_axs_titles_from_ids_concurrently(start_id, stop_id)
-    process_csv(ids_and_titles)
+    ids = list(range(start_id, stop_id + 1))
+    urls = [axs_id_to_url(id) for id in ids]
+    titles = get_axs_titles_from_urls(urls)
+
+    process_csv(titles, "")
 
     print(time.time() - start_time)
+    # ----- Benchmark stop ----- #
