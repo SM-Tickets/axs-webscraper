@@ -1,26 +1,35 @@
 import sys
 import csv
 import time
+import datetime
+import threading
 
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
 
 import asyncio
+from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
 from requests_html import AsyncHTMLSession # https://requests.readthedocs.io/projects/requests-html/en/latest/
 
 
 class AxsWebscraper:
-    def __init__(self, start_id, stop_id, outfile=None, concurrency_limit=10):
+    def __init__(self, start_id, stop_id, outfile="", concurrency_limit=10):
         self.start_id = start_id
         self.stop_id = stop_id
-        self.outfile = outfile
+        if outfile == "":
+            current_datetime = datetime.datetime.now()
+            formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+            self.outfile = f"{formatted_datetime}.csv"
+        else:
+            self.outfile = outfile
         self.semaphore = asyncio.Semaphore(concurrency_limit)
 
         self.ids = list(range(start_id, stop_id + 1))
         self.urls = [self._id_to_url(id) for id in self.ids]
-        self.htmls = asyncio.run(self._get_html())
-        self.titles = self._get_titles()
+
+        self.is_running = False
 
     def _id_to_url(self, id):
         """Get the URL for given axs event ID
@@ -33,75 +42,76 @@ class AxsWebscraper:
         """
         return f"https://www.axs.com/series/{id}/"
 
-    async def _get_webpage_response(self, url, asession):
-        """Get the response object of a webpage
+    async def _get_html(self, url):
+        """Get html for a url
 
         Args:
-            url (str): URL of webpage
+          url (str): url to be requested
 
         Returns:
-            requests.Response: Response object of webpage
-        """
-        print(f"sending request to {url}")
-        r = await asession.get(url)
-        print(f"response received for {url}")
-        return r
-
-    async def _render_webpage_response(self, resp):
-        """Render dynamic html by executing the javascript in the initial response from the server
-
-        Args:
-            resp (requests.Response): Initial response object of webpage
-
-        Returns:
-            requests_html.HTML: HTML object of webpage
+            dict{str: str}: Mapping of url to raw html
         """
         async with self.semaphore:
-            print(f"rendering html for {resp.url}")
-            await resp.html.arender(timeout=0)
-            print(f"finished rendering html for {resp.url}")
-            return resp.html
+            print(f"sending request to {url}")
+            async with async_playwright() as pw:
+                browser = await pw.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(url)
+                html = await page.content()
+                await browser.close()
+            print(f"received response from {url}")
 
-    async def _get_html(self):
+        return {url: html}
+
+    async def _get_htmls(self):
         """Get html for urls
 
         Returns:
-            list[requests_html.HTML]: List of HTML objects of webpages
+            dict{str: BeautifulSoup.BeautifulSoup}: Mapping of urls to BeautifulSoup objects representing the url's corresponding HTML
         """
 
-        # initial requests to server
-        asession = AsyncHTMLSession()
-        request_coros = [self._get_webpage_response(url, asession) for url in self.urls]
-        responses = await asyncio.gather(*request_coros)
+        coros = [self._get_html(url) for url in self.urls]
+        urls_to_raw_htmls = await asyncio.gather(*coros)
 
-        # render javascript
-        render_coros = [self._render_webpage_response(response) for response in responses]
-        htmls = await asyncio.gather(*render_coros)
-
-        return htmls
+        return {url: BeautifulSoup(html, 'html.parser') for url_to_raw_html in urls_to_raw_htmls for url, html in url_to_raw_html.items()}
 
     def _get_titles(self):
         """Parse the html for the title of the series
 
         Returns:
-            str|None: The title of the axs event if it exists, else None
+            dict{str: str|None}: Mapping of urls to their AXS event titles
         """
-        titles = []
-        for html in self.htmls:
-            title = html.find("h1.series-header__main-title", first=True)
+        titles = {}
+        urls_to_htmls = asyncio.run(self._get_htmls())
+        for url, html in urls_to_htmls.items():
+            title = html.find('h1', class_='series-header__main-title')
             if title:
-                title = title.full_text.strip()  # remove html tags and leading/trailing whitespace
-            titles.append(title)
+                title = title.text.strip()  # remove html tags and leading/trailing whitespace
+            titles[url] = title
 
         return titles
 
-    def run(self, filepath="", force=False):
-        # TODO: actually process file
-        print(self.titles)
+    def run(self, force=False):
+        print(f"poop{self.outfile}")
+        if self.is_running == False:
+            self.is_running = True
+
+            self.urls_to_titles = self._get_titles()
+            print(f"\n{self.urls_to_titles}")
+            with open(self.outfile, mode='w') as file:
+                file.write(f"URL,Title\n")
+                for url, title in self.urls_to_titles.items():
+                    file.write(f"{url},{title}\n")
+
+            print(f"\nResult stored in {self.outfile}")
+
+            self.is_running = False
 
 
 class AxsGui:
     def __init__(self):
+        self.is_running = False
+
         # ROOT
         self.root = tk.Tk()
         self.root.title("AXS Webscraper")
@@ -138,7 +148,7 @@ class AxsGui:
         self.select_folder_button.pack(side=tk.RIGHT, ipadx=2, ipady=2)
 
         # RUN
-        self.run_button = tk.Button(self.root, text="Run", command=lambda: self.scrape())
+        self.run_button = tk.Button(self.root, text="Run", command=lambda: threading.Thread(target=self.scrape).start())
         self.run_button.pack(pady=(10,0))
 
         # OUTPUT WINDOW
@@ -162,6 +172,9 @@ class AxsGui:
                 self.text_widget["state"] = initial_state
                 sys.__stdout__.write(message) # write to original stdout
 
+            def flush(self):
+                pass
+
         sys.stdout = StdoutRedirector(self.output_text)
 
     def _select_folder(self):
@@ -183,13 +196,18 @@ class AxsGui:
         return self.filename_entry.get()
 
     def scrape(self):
-        start_time = time.time()                           # ----- Benchmark start ----- #
+        if not self.is_running:
+            self.is_running = True
+            start_time = time.time()                           # ----- Benchmark start ----- #
 
-        scraper = AxsWebscraper(self.start_id, self.stop_id, self.outfile)
-        scraper.run()
-        print("\nFinished scrape")
+            scraper = AxsWebscraper(self.start_id, self.stop_id, self.outfile)
+            scraper.run()
+            print("\nFinished scrape")
 
-        print(f"Time elapsed: {time.time() - start_time}") # ----- Benchmark stop ----- #
+            print(f"Time elapsed: {time.time() - start_time}") # ----- Benchmark stop ----- #
+            self.is_running = False
+        else:
+            print("\nScrape already in progress\n")
 
     def run(self):
         self.root.mainloop()
