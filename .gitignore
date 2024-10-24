@@ -1,3 +1,7 @@
-chromedriver
 venv
 .worktrees
+output
+axs-webscraper
+axs-webscraper.spec
+build
+dist

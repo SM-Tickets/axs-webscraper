@@ -1,3 +1,4 @@
+import os
 import sys
 import csv
 import time
@@ -11,7 +12,6 @@ from PIL import Image, ImageTk
 import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
-from requests_html import AsyncHTMLSession # https://requests.readthedocs.io/projects/requests-html/en/latest/
 
 
 class AxsWebscraper:
@@ -21,7 +21,7 @@ class AxsWebscraper:
         if outfile == "":
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
-            self.outfile = f"{formatted_datetime}.csv"
+            self.outfile = f"output/{formatted_datetime}.csv"
         else:
             self.outfile = outfile
         self.semaphore = asyncio.Semaphore(concurrency_limit)
@@ -98,6 +98,11 @@ class AxsWebscraper:
 
             self.urls_to_titles = self._get_titles()
             print(f"\n{self.urls_to_titles}")
+
+            dirname = os.path.dirname(self.outfile)
+            if dirname != "" and not os.path.exists(dirname):
+                os.makedirs(dirname)
+
             with open(self.outfile, mode='w') as file:
                 file.write(f"URL,Title\n")
                 for url, title in self.urls_to_titles.items():
@@ -138,7 +143,7 @@ class AxsGui:
         self.filename_entry = tk.Entry(self.filename_frame)
         self.filename_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        self.file_img = Image.open("file.png")
+        self.file_img = Image.open("assets/file.png")
         width, height = self.file_img.size
         self.file_img_resized = self.file_img.resize((width//7, height//7))
         self.file_img_tk = ImageTk.PhotoImage(self.file_img_resized)
