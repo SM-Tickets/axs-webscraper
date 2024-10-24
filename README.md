@@ -2,10 +2,14 @@
 
 ## Installation
 
-- requires python with tkinter
+- requires python3 with tkinter
 
 ```
-python -m venv venv
+git clone https://github.com/austinliuigi/axs-webscraper.git
+cd axs-webscraper
+
+python3 -m venv venv
+source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
