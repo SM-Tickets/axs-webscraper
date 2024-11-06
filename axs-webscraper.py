@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 
 class AxsWebscraper:
-    def __init__(self, start_id, stop_id, outfile="", concurrency_limit=10):
+    def __init__(self, start_id, stop_id, concurrent_windows, outfile=""):
         self.start_id = start_id
         self.stop_id = stop_id
         if outfile == "":
@@ -24,10 +24,11 @@ class AxsWebscraper:
             self.outfile = f"output/{formatted_datetime}.csv"
         else:
             self.outfile = outfile
-        self.semaphore = asyncio.Semaphore(concurrency_limit)
+        self.semaphore = asyncio.Semaphore(int(concurrent_windows))
 
         self.ids = list(range(start_id, stop_id + 1))
         self.urls = [self._id_to_url(id) for id in self.ids]
+        self.failed_connections = []
 
         self.is_running = False
 
@@ -42,7 +43,16 @@ class AxsWebscraper:
         """
         return f"https://www.axs.com/series/{id}/"
 
-    async def _get_html(self, url):
+    async def _start_browser(self):
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(headless=True)
+        return browser, playwright
+
+    async def _close_browser(self, playwright, browser):
+        await browser.close()
+        await playwright.stop()
+
+    async def _get_html(self, url, browser):
         """Get html for a url
 
         Args:
@@ -53,12 +63,18 @@ class AxsWebscraper:
         """
         async with self.semaphore:
             print(f"sending request to {url}")
-            async with async_playwright() as pw:
-                browser = await pw.chromium.launch()
-                page = await browser.new_page()
+            page = await browser.new_page()
+            try:
                 await page.goto(url)
-                html = await page.content()
-                await browser.close()
+            except Exception as err:
+                print(f"error for {url}")
+                print(err)
+                self.failed_connections.append(url)
+                return {url: ""}
+            if url in self.failed_connections:
+                self.failed_connections.remove(url)
+            html = await page.content()
+            await page.close()
             print(f"received response from {url}")
 
         return {url: html}
@@ -70,8 +86,21 @@ class AxsWebscraper:
             dict{str: BeautifulSoup.BeautifulSoup}: Mapping of urls to BeautifulSoup objects representing the url's corresponding HTML
         """
 
-        coros = [self._get_html(url) for url in self.urls]
+        browser, playwright = await self._start_browser()
+
+        # get html of each url
+        coros = [self._get_html(url, browser) for url in self.urls]
         urls_to_raw_htmls = await asyncio.gather(*coros)
+
+        # retry failed connections up to 10 times
+        for _ in range(10):
+            if len(self.failed_connections) == 0:
+                break
+            print(f"\nRetrying failed connections:")
+            coros = [self._get_html(url, browser) for url in self.failed_connections]
+            urls_to_raw_htmls.extend(await asyncio.gather(*coros))
+
+        await self._close_browser(playwright, browser)
 
         return {url: BeautifulSoup(html, 'html.parser') for url_to_raw_html in urls_to_raw_htmls for url, html in url_to_raw_html.items()}
 
@@ -92,12 +121,13 @@ class AxsWebscraper:
         return titles
 
     def run(self, force=False):
-        print(f"poop{self.outfile}")
         if self.is_running == False:
             self.is_running = True
 
             self.urls_to_titles = self._get_titles()
             print(f"\n{self.urls_to_titles}")
+
+            print(f"\nWriting results to {self.outfile}")
 
             dirname = os.path.dirname(self.outfile)
             if dirname != "" and not os.path.exists(dirname):
@@ -107,6 +137,8 @@ class AxsWebscraper:
                 file.write(f"URL,Title\n")
                 for url, title in self.urls_to_titles.items():
                     file.write(f"{url},{title}\n")
+
+            print(f"\nFailed connections: {self.failed_connections}")
 
             print(f"\nResult stored in {self.outfile}")
 
@@ -120,18 +152,28 @@ class AxsGui:
         # ROOT
         self.root = tk.Tk()
         self.root.title("AXS Webscraper")
+        self.root.geometry("400x600")
 
-        # START_ID
+        # START ID
         self.start_id_label = tk.Label(self.root, text="Start ID:")
         self.start_id_label.pack()
         self.start_id_entry = tk.Entry(self.root)
         self.start_id_entry.pack()
 
-        # STOP_ID
+        # STOP ID
         self.stop_id_label = tk.Label(self.root, text="Stop ID:")
         self.stop_id_label.pack(pady=(10,0))
         self.stop_id_entry = tk.Entry(self.root)
         self.stop_id_entry.pack()
+
+        # NUMBER OF CONCURRENT WINDOWS
+        self.concurrent_windows_label = tk.Label(self.root, text="No. of concurrent windows:")
+        self.concurrent_windows_label.pack(pady=(10,0))
+        self.concurrent_windows_entry = tk.Entry(self.root)
+        self.concurrent_windows_entry.pack()
+        default_concurrent_windows = "10"
+        self.concurrent_windows_entry.insert(0, default_concurrent_windows)
+
 
         # FILE SELECTION
         self.filename_label = tk.Label(self.root, text="Filename:")
@@ -153,7 +195,7 @@ class AxsGui:
         self.select_folder_button.pack(side=tk.RIGHT, ipadx=2, ipady=2)
 
         # RUN
-        self.run_button = tk.Button(self.root, text="Run", command=lambda: threading.Thread(target=self.scrape).start())
+        self.run_button = tk.Button(self.root, text="Run", command=lambda: threading.Thread(target=self.scrape, daemon=True).start())
         self.run_button.pack(pady=(10,0))
 
         # OUTPUT WINDOW
@@ -197,15 +239,28 @@ class AxsGui:
         return int(self.stop_id_entry.get())
 
     @property
+    def concurrent_windows(self):
+        return int(self.concurrent_windows_entry.get())
+
+    @property
     def outfile(self):
         return self.filename_entry.get()
 
     def scrape(self):
+        if self.start_id == "":
+            print("Need to provide a start_id")
+            return
+        if self.stop_id == "":
+            print("Need to provide a stop_id")
+            return
+        if self.concurrent_windows == "":
+            print("Need to provide the number of concurrent windows")
+            return
         if not self.is_running:
             self.is_running = True
             start_time = time.time()                           # ----- Benchmark start ----- #
 
-            scraper = AxsWebscraper(self.start_id, self.stop_id, self.outfile)
+            scraper = AxsWebscraper(self.start_id, self.stop_id, self.concurrent_windows, self.outfile)
             scraper.run()
             print("\nFinished scrape")
 
