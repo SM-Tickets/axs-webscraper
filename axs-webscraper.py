@@ -21,7 +21,7 @@ class AxsWebscraper:
         if outfile == "":
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
-            self.outfile = f"output/{formatted_datetime}.csv"
+            self.outfile = f"output/{formatted_datetime}_{self.start_id}-{self.stop_id}.csv"
         else:
             self.outfile = outfile
         self.semaphore = asyncio.Semaphore(int(concurrent_windows))
@@ -125,7 +125,9 @@ class AxsWebscraper:
             self.is_running = True
 
             self.urls_to_titles = self._get_titles()
-            print(f"\n{self.urls_to_titles}")
+            # print(f"\n{self.urls_to_titles}")
+
+            print(f"\nFailed connections: {self.failed_connections}")
 
             print(f"\nWriting results to {self.outfile}")
 
@@ -137,8 +139,6 @@ class AxsWebscraper:
                 file.write(f"URL,Title\n")
                 for url, title in self.urls_to_titles.items():
                     file.write(f"{url},{title}\n")
-
-            print(f"\nFailed connections: {self.failed_connections}")
 
             print(f"\nResult stored in {self.outfile}")
 
@@ -185,7 +185,7 @@ class AxsGui:
         self.filename_entry = tk.Entry(self.filename_frame)
         self.filename_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        self.file_img = Image.open("assets/file.png")
+        self.file_img = Image.open(self.get_asset_path("assets/file.png"))
         width, height = self.file_img.size
         self.file_img_resized = self.file_img.resize((width//7, height//7))
         self.file_img_tk = ImageTk.PhotoImage(self.file_img_resized)
@@ -205,6 +205,14 @@ class AxsGui:
         self.output_text.pack(expand=True, fill=tk.X)
 
         self._connect_stdout_to_output_widget()
+
+    def get_asset_path(self, filename):
+        if getattr(sys, 'frozen', False):  # check if running as bundled executable
+            base_path = sys._MEIPASS  # pyinstaller temporary folder for bundled files
+        else:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, filename)
 
     def _connect_stdout_to_output_widget(self):
         class StdoutRedirector:
