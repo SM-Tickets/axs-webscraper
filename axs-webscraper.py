@@ -208,7 +208,7 @@ class AxsGui:
 
     def get_asset_path(self, filename):
         if getattr(sys, 'frozen', False):  # check if running as bundled executable
-            base_path = sys._MEIPASS  # pyinstaller temporary folder for bundled files
+            base_path = sys._MEIPASS  # pyinstaller temporary folder for bundled files (https://stackoverflow.com/questions/51060894/adding-a-data-file-in-pyinstaller-using-the-onefile-option)
         else:
             base_path = os.path.abspath(".")
 
