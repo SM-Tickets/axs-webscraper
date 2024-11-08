@@ -13,6 +13,11 @@ import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
+def get_application_path():
+    if getattr(sys, 'frozen', False):  # if running as bundled executable
+        return os.path.dirname(sys.executable)
+    elif __file__:
+        return os.path.dirname(__file__)
 
 class AxsWebscraper:
     def __init__(self, start_id, stop_id, concurrent_windows, outfile=""):
@@ -21,7 +26,7 @@ class AxsWebscraper:
         if outfile == "":
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
-            self.outfile = f"output/{formatted_datetime}_{self.start_id}-{self.stop_id}.csv"
+            self.outfile = f"{get_application_path()}/output/{formatted_datetime}_{self.start_id}-{self.stop_id}.csv"
         else:
             self.outfile = outfile
         self.semaphore = asyncio.Semaphore(int(concurrent_windows))
@@ -207,7 +212,7 @@ class AxsGui:
         self._connect_stdout_to_output_widget()
 
     def get_asset_path(self, filename):
-        if getattr(sys, 'frozen', False):  # check if running as bundled executable
+        if getattr(sys, 'frozen', False):  # if running as bundled executable
             base_path = sys._MEIPASS  # pyinstaller temporary folder for bundled files (https://stackoverflow.com/questions/51060894/adding-a-data-file-in-pyinstaller-using-the-onefile-option)
         else:
             base_path = os.path.abspath(".")
