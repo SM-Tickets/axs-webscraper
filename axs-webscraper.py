@@ -75,6 +75,7 @@ class AxsWebscraper:
                 print(f"error for {url}")
                 print(err)
                 self.failed_connections.append(url)
+                await page.close()
                 return {url: ""}
             if url in self.failed_connections:
                 self.failed_connections.remove(url)
