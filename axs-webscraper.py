@@ -161,19 +161,19 @@ class AxsGui:
         self.root.geometry("400x600")
 
         # START ID
-        self.start_id_label = tk.Label(self.root, text="Start ID:")
+        self.start_id_label = tk.Label(self.root, text="*Start ID:")
         self.start_id_label.pack()
         self.start_id_entry = tk.Entry(self.root)
         self.start_id_entry.pack()
 
         # STOP ID
-        self.stop_id_label = tk.Label(self.root, text="Stop ID:")
+        self.stop_id_label = tk.Label(self.root, text="*Stop ID:")
         self.stop_id_label.pack(pady=(10,0))
         self.stop_id_entry = tk.Entry(self.root)
         self.stop_id_entry.pack()
 
         # NUMBER OF CONCURRENT WINDOWS
-        self.concurrent_windows_label = tk.Label(self.root, text="No. of concurrent windows:")
+        self.concurrent_windows_label = tk.Label(self.root, text="*No. of concurrent windows:")
         self.concurrent_windows_label.pack(pady=(10,0))
         self.concurrent_windows_entry = tk.Entry(self.root)
         self.concurrent_windows_entry.pack()
