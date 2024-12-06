@@ -51,6 +51,7 @@ class AxsWebscraper:
     async def _start_browser(self):
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(headless=True)
+        # browser = await playwright.firefox.launch(headless=True)
         return browser, playwright
 
     async def _close_browser(self, playwright, browser):
@@ -108,7 +109,8 @@ class AxsWebscraper:
 
         await self._close_browser(playwright, browser)
 
-        return {url: BeautifulSoup(html, 'html.parser') for url_to_raw_html in urls_to_raw_htmls for url, html in url_to_raw_html.items()}
+        # return {url: BeautifulSoup(html, 'html.parser') for url_to_raw_html in urls_to_raw_htmls for url, html in url_to_raw_html.items()}
+        return {url: html for url_to_raw_html in urls_to_raw_htmls for url, html in url_to_raw_html.items()}
 
     def _get_titles(self):
         """Parse the html for the title of the series
@@ -119,6 +121,7 @@ class AxsWebscraper:
         titles = {}
         urls_to_htmls = asyncio.run(self._get_htmls())
         for url, html in urls_to_htmls.items():
+            html = BeautifulSoup(html, 'html.parser')
             title = html.find('h1', class_='series-header__main-title')
             if title:
                 title = title.text.strip()  # remove html tags and leading/trailing whitespace
@@ -177,7 +180,7 @@ class AxsGui:
         self.concurrent_windows_label.pack(pady=(10,0))
         self.concurrent_windows_entry = tk.Entry(self.root)
         self.concurrent_windows_entry.pack()
-        default_concurrent_windows = "10"
+        default_concurrent_windows = "5"
         self.concurrent_windows_entry.insert(0, default_concurrent_windows)
 
 
