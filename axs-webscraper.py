@@ -4,6 +4,8 @@ import csv
 import time
 import datetime
 import threading
+import platform
+import subprocess
 
 import tkinter as tk
 from tkinter import filedialog
@@ -12,6 +14,23 @@ from PIL import Image, ImageTk
 import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+
+print("Ensuring browser driver is installed...")
+
+# Use system playwright browser path instead of hermetic install because pyinstaller can't parse browser driver binary
+#  - we set this manually because otherwise, the PLAYWRIGHT_BROWSERS_PATH environment variable would by default be empty and will automatically be set to 0 by the internal playwright code when launching a browser further in the code if the program was run with a pyinstaller binary (https://github.com/microsoft/playwright-python/pull/1002/files)
+#  - setting PLAYWRIGHT_BROWSERS_PATH manually:
+#    - removes the inconsistency of being different based on whether or not the program was run with a pyinstaller binary
+#    - removes the inconsistency of being different before and after playwright launches a browser if run with a pyinstaller binary
+OS = platform.system()
+if OS == "Windows":
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "ms-playwright")
+elif OS == "Darwin":
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["HOME"], "Library", "Caches", "ms-playwright")
+elif OS == "Linux":
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["HOME"], ".cache", "ms-playwright")
+
+subprocess.run(["playwright", "install", "chromium"])
 
 def get_application_path():
     if getattr(sys, 'frozen', False):  # if running as bundled executable
@@ -194,7 +213,7 @@ class AxsGui:
         self.filename_entry = tk.Entry(self.filename_frame)
         self.filename_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        self.file_img = Image.open(self.get_asset_path("assets/file.png"))
+        self.file_img = Image.open(self.get_asset_path(os.path.join("assets", "file.png")))
         width, height = self.file_img.size
         self.file_img_resized = self.file_img.resize((width//7, height//7))
         self.file_img_tk = ImageTk.PhotoImage(self.file_img_resized)

@@ -1,7 +1,5 @@
 build:
-	playwright install chromium
-	# playwright install firefox
-	pyinstaller --onefile --add-data "./assets:./assets" --runtime-hook scripts/pyinstaller_hook.py axs-webscraper.py
+	pyinstaller --onefile --add-data "./assets:./assets" axs-webscraper.py
 
 install:
 	mv dist/axs-webscraper .
