@@ -15,28 +15,17 @@ import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
-print("Ensuring browser driver is installed...")
-
-# Use system playwright browser path instead of hermetic install because pyinstaller can't parse browser driver binary
-#  - we set this manually because otherwise, the PLAYWRIGHT_BROWSERS_PATH environment variable would by default be empty and will automatically be set to 0 by the internal playwright code when launching a browser further in the code if the program was run with a pyinstaller binary (https://github.com/microsoft/playwright-python/pull/1002/files)
-#  - setting PLAYWRIGHT_BROWSERS_PATH manually:
-#    - removes the inconsistency of being different based on whether or not the program was run with a pyinstaller binary
-#    - removes the inconsistency of being different before and after playwright launches a browser if run with a pyinstaller binary
-OS = platform.system()
-if OS == "Windows":
-    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "ms-playwright")
-elif OS == "Darwin":
-    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["HOME"], "Library", "Caches", "ms-playwright")
-elif OS == "Linux":
-    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(os.environ["HOME"], ".cache", "ms-playwright")
-
-subprocess.run(["playwright", "install", "chromium"])
-
 def get_application_path():
+    """
+    Get path to this program
+    """
     if getattr(sys, 'frozen', False):  # if running as bundled executable
         return os.path.dirname(sys.executable)
     elif __file__:
         return os.path.dirname(__file__)
+
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(get_application_path() or ".", "browser_drivers")
+print(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
 
 class AxsWebscraper:
     def __init__(self, start_id, stop_id, concurrent_windows, outfile=""):

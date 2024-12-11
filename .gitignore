@@ -6,3 +6,4 @@ axs-webscraper
 axs-webscraper.spec
 build
 dist
+browser_drivers
