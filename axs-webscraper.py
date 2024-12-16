@@ -153,7 +153,7 @@ class AxsWebscraper:
             if dirname != "" and not os.path.exists(dirname):
                 os.makedirs(dirname)
 
-            with open(self.outfile, mode='w') as file:
+            with open(self.outfile, mode='w', encoding="utf-8") as file:
                 file.write(f"URL,Title\n")
                 for url, title in self.urls_to_titles.items():
                     file.write(f"{url},{title}\n")
