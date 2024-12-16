@@ -21,10 +21,10 @@ def get_application_path():
     """
     if getattr(sys, 'frozen', False):  # if running as bundled executable
         return os.path.dirname(sys.executable)
-    elif __file__:
+    else:
         return os.path.dirname(__file__)
 
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(get_application_path() or ".", "browser_drivers")
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(get_application_path(), "browser_drivers")
 print(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
 
 class AxsWebscraper:
@@ -34,7 +34,8 @@ class AxsWebscraper:
         if outfile == "":
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
-            self.outfile = f"{get_application_path()}/output/{formatted_datetime}_{self.start_id}-{self.stop_id}.csv"
+            # self.outfile = f"{get_application_path()}/output/{formatted_datetime}_{self.start_id}-{self.stop_id}.csv"
+            self.outfile = os.path.join(get_application_path(), "output", f"{formatted_datetime}_{self.start_id}-{self.stop_id}.csv")
         else:
             self.outfile = outfile
         self.semaphore = asyncio.Semaphore(int(concurrent_windows))
