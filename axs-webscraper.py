@@ -222,7 +222,7 @@ class AxsGui:
         self.output_text = tk.Text(self.root, height=20, width=50, state=tk.DISABLED)
         self.output_text.pack(expand=True, fill=tk.X)
 
-        self._connect_stdout_to_output_widget()
+        self._connect_output_to_tk_text_widget()
 
     def get_asset_path(self, filename):
         if getattr(sys, 'frozen', False):  # if running as bundled executable
@@ -232,10 +232,11 @@ class AxsGui:
 
         return os.path.join(base_path, filename)
 
-    def _connect_stdout_to_output_widget(self):
-        class StdoutRedirector:
-            def __init__(self, text_widget):
+    def _connect_output_to_tk_text_widget(self, stdout=True, stderr=True):
+        class OutputRedirector:
+            def __init__(self, text_widget, fd):
                 self.text_widget = text_widget
+                self.fd = fd
 
             def write(self, message):
                 initial_state = self.text_widget["state"]
@@ -243,13 +244,19 @@ class AxsGui:
                 self.text_widget.insert(tk.END, message)
                 self.text_widget.see(tk.END)  # scroll to the end
                 self.text_widget["state"] = initial_state
-                if sys.__stdout__ != None: # if connected to stdout (not true when run from pyinstaller executable that was built with --noconsole)
+                if self.fd == 1 and sys.__stdout__ != None: # if connected to stdout (not true when run from pyinstaller executable that was built with --noconsole)
                     sys.__stdout__.write(message) # write to original stdout
+                if self.fd == 2 and sys.__stderr__ != None: # if connected to stderr (not true when run from pyinstaller executable that was built with --noconsole)
+                    sys.__stderr__.write(message) # write to original stdout
 
             def flush(self):
                 pass
 
-        sys.stdout = StdoutRedirector(self.output_text)
+        if stdout:
+            sys.stdout = OutputRedirector(self.output_text, 1)
+        if stderr:
+            sys.stderr = OutputRedirector(self.output_text, 2)
+
 
     def _select_folder(self):
         folder_selected = filedialog.asksaveasfilename()
@@ -293,6 +300,7 @@ class AxsGui:
             self.is_running = True
             start_time = time.time()                           # ----- Benchmark start ----- #
 
+            print("\nStarting scrape")
             scraper = AxsWebscraper(self.start_id, self.stop_id, self.concurrent_windows, self.outfile)
             scraper.run()
             print("\nFinished scrape")
