@@ -134,6 +134,8 @@ class AxsWebscraper:
         """
         titles = {}
         urls_to_htmls = asyncio.run(self._get_htmls())
+
+        print("Parsing responses...")
         for url, html in urls_to_htmls.items():
             html = BeautifulSoup(html, 'html.parser')
             title = html.find('h1', class_='series-header__main-title')
@@ -150,7 +152,7 @@ class AxsWebscraper:
             self.urls_to_titles = self._get_titles()
             # print(f"\n{self.urls_to_titles}")
 
-            print(f"\nFailed connections: {self.failed_connections}")
+            print(f"\nUnresolved failed connections: {self.failed_connections}")
 
             print(f"\nSaving results")
 
@@ -310,7 +312,7 @@ class AxsGui:
             scraper.run()
             print("\nFinished scrape")
 
-            print(f"Time elapsed: {time.time() - start_time}") # ----- Benchmark stop ----- #
+            print(f"Time elapsed: {time.time() - start_time:.2f}s") # ----- Benchmark stop ----- #
             self.is_running = False
         else:
             print("\nScrape already in progress\n")
