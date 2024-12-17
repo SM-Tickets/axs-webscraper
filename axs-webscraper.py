@@ -170,7 +170,7 @@ class AxsGui:
         # ROOT
         self.root = tk.Tk()
         self.root.title("AXS Webscraper")
-        self.root.geometry("400x600")
+        self.root.geometry("450x600")
 
         # START ID
         self.start_id_label = tk.Label(self.root, text="*Start ID:")
