@@ -205,9 +205,9 @@ class AxsGui:
         self.filename_label.pack(pady=(10,0))
 
         self.filename_frame = tk.Frame(self.root)
-        self.filename_frame.pack(fill=tk.X, padx=50, pady=5)
+        self.filename_frame.pack(pady=5)
 
-        self.filename_entry = tk.Entry(self.filename_frame)
+        self.filename_entry = tk.Entry(self.filename_frame, width=30)
         self.filename_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
         self.file_img = Image.open(self.get_asset_path(os.path.join("assets", "file.png")))
