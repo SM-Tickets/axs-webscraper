@@ -16,11 +16,16 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
 def get_application_path():
-    """
-    Get path to this program
-    """
     if getattr(sys, 'frozen', False):  # if running as bundled executable
-        return os.path.dirname(sys.executable)
+        # if ran using macos application
+        path_components = sys.executable.split(os.sep)
+        if "axs-webscraper.app" in path_components:
+            dir_index = path_components.index("axs-webscraper.app")
+            return os.sep.join(path_components[:dir_index])
+        # if run using raw executable
+        else:
+            return os.path.dirname(sys.executable)
+    # if invoked via python
     else:
         return os.path.dirname(__file__)
 
@@ -300,7 +305,7 @@ class AxsGui:
             self.is_running = True
             start_time = time.time()                           # ----- Benchmark start ----- #
 
-            print("\nStarting scrape")
+            print("\nStarting scrape:\n")
             scraper = AxsWebscraper(self.start_id, self.stop_id, self.concurrent_windows, self.outfile)
             scraper.run()
             print("\nFinished scrape")

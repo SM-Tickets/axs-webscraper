@@ -3,6 +3,7 @@ venv
 .worktrees
 output
 axs-webscraper
+axs-webscraper.app
 axs-webscraper.spec
 build
 dist
