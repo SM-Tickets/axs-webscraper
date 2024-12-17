@@ -152,7 +152,7 @@ class AxsWebscraper:
 
             print(f"\nFailed connections: {self.failed_connections}")
 
-            print(f"\nWriting results to {self.outfile}")
+            print(f"\nSaving results")
 
             dirname = os.path.dirname(self.outfile)
             if dirname != "" and not os.path.exists(dirname):
@@ -163,7 +163,7 @@ class AxsWebscraper:
                 for url, title in self.urls_to_titles.items():
                     file.write(f"{url},{title}\n")
 
-            print(f"\nResult stored in {self.outfile}")
+            print(f"\nResults stored in {self.outfile}")
 
             self.is_running = False
 
@@ -175,7 +175,7 @@ class AxsGui:
         # ROOT
         self.root = tk.Tk()
         self.root.title("AXS Webscraper")
-        self.root.geometry("450x600")
+        self.root.geometry("500x600")
 
         # START ID
         self.start_id_label = tk.Label(self.root, text="*Start ID:")
