@@ -7,7 +7,8 @@ install:
 	if [ -e dist/axs-webscraper.app ]; then rm -rf axs-webscraper.app; cp -a dist/axs-webscraper.app .; fi
 
 package:
-	zip -r axs-webscraper.zip axs-webscraper browser_drivers/
+	if [ "$$(uname -o)" = "Darwin" ]; then zip -r axs-webscraper.zip axs-webscraper.app browser_drivers/; fi
+	if [ "$$(uname -o)" = "Msys" ]; then zip -r axs-webscraper.zip axs-webscraper.exe browser_drivers/; fi
 
 clean:
 	rm -rf dist build axs-webscraper.spec
