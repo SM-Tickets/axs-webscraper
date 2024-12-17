@@ -259,14 +259,20 @@ class AxsGui:
 
     @property
     def start_id(self):
+        if self.start_id_entry.get() == "":
+            return -1
         return int(self.start_id_entry.get())
 
     @property
     def stop_id(self):
+        if self.stop_id_entry.get() == "":
+            return -1
         return int(self.stop_id_entry.get())
 
     @property
     def concurrent_windows(self):
+        if self.concurrent_windows_entry.get() == "":
+            return -1
         return int(self.concurrent_windows_entry.get())
 
     @property
@@ -274,13 +280,13 @@ class AxsGui:
         return self.filename_entry.get()
 
     def scrape(self):
-        if self.start_id == "":
+        if self.start_id == -1:
             print("Need to provide a start_id")
             return
-        if self.stop_id == "":
+        if self.stop_id == -1:
             print("Need to provide a stop_id")
             return
-        if self.concurrent_windows == "":
+        if self.concurrent_windows == -1:
             print("Need to provide the number of concurrent windows")
             return
         if not self.is_running:
