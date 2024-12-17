@@ -243,7 +243,8 @@ class AxsGui:
                 self.text_widget.insert(tk.END, message)
                 self.text_widget.see(tk.END)  # scroll to the end
                 self.text_widget["state"] = initial_state
-                sys.__stdout__.write(message) # write to original stdout
+                if sys.__stdout__ != None: # if connected to stdout (not true when run from pyinstaller executable that was built with --noconsole)
+                    sys.__stdout__.write(message) # write to original stdout
 
             def flush(self):
                 pass

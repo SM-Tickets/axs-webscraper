@@ -1,9 +1,10 @@
 build:
 	PLAYWRIGHT_BROWSERS_PATH=./browser_drivers playwright install chromium
-	pyinstaller --onefile --add-data "./assets:./assets" axs-webscraper.py
+	pyinstaller --noconsole --icon ./assets/axs_logo.png --onefile --add-data "./assets:./assets" axs-webscraper.py
 
 install:
-	mv dist/axs-webscraper .
+	if [ -e dist/axs-webscraper ]; then cp dist/axs-webscraper .; fi
+	if [ -e dist/axs-webscraper.app ]; then rm -rf axs-webscraper.app; cp -a dist/axs-webscraper.app .; fi
 
 package:
 	zip -r axs-webscraper.zip axs-webscraper browser_drivers/
