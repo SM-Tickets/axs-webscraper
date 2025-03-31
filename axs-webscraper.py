@@ -65,7 +65,7 @@ class AxsWebscraper:
     async def _start_browser(self):
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(headless=True)
-        # browser = await playwright.firefox.launch(headless=True)
+        # browser = await playwright.chromium.launch(headless=False, slow_mo=5000)
         return browser, playwright
 
     async def _close_browser(self, playwright, browser):
@@ -83,7 +83,9 @@ class AxsWebscraper:
         """
         async with self.semaphore:
             print(f"sending request to {url}")
-            page = await browser.new_page()
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+            context = await browser.new_context(user_agent=user_agent)
+            page = await context.new_page()
             try:
                 await page.goto(url)
             except Exception as err:
@@ -95,7 +97,8 @@ class AxsWebscraper:
             if url in self.failed_connections:
                 self.failed_connections.remove(url)
             html = await page.content()
-            await page.close()
+            # await page.pause()
+            await context.close()
             print(f"received response from {url}")
 
         return {url: html}
@@ -111,7 +114,7 @@ class AxsWebscraper:
 
         # get html of each url
         coros = [self._get_html(url, browser) for url in self.urls]
-        urls_to_raw_htmls = await asyncio.gather(*coros)
+        urls_to_raw_htmls = await asyncio.gather(*coros) # the result is in the same order as the passed-in list of coros
 
         # retry failed connections up to 10 times
         for _ in range(10):
@@ -138,9 +141,9 @@ class AxsWebscraper:
         print("Parsing responses...")
         for url, html in urls_to_htmls.items():
             html = BeautifulSoup(html, 'html.parser')
-            title = html.find('h1', class_='series-header__main-title')
+            title = html.find('h1', class_='series-header__main-title') or html.find('div', class_='styles__SeriesName-sc-a987fbc9-2')
             if title:
-                title = title.text.strip()  # remove html tags and leading/trailing whitespace
+                title = title.text.strip()
             titles[url] = title
 
         return titles
