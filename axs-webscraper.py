@@ -65,7 +65,7 @@ class AxsWebscraper:
     async def _start_browser(self):
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(headless=True)
-        # browser = await playwright.chromium.launch(headless=False, slow_mo=5000)
+        # browser = await playwright.chromium.launch(headless=False, slow_mo=10000)
         return browser, playwright
 
     async def _close_browser(self, playwright, browser):
@@ -141,7 +141,7 @@ class AxsWebscraper:
         print("Parsing responses...")
         for url, html in urls_to_htmls.items():
             html = BeautifulSoup(html, 'html.parser')
-            title = html.find('h1', class_='series-header__main-title') or html.find('div', class_='styles__SeriesName-sc-a987fbc9-2')
+            title = html.find('h1', class_='series-header__main-title') or html.find('div', class_='styles__SeriesName-sc-a987fbc9-2') or html.find('div', class_='styles__SeriesName-sc-7ec0aa62-2')
             if title:
                 title = title.text.strip()
             titles[url] = title
